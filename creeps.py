@@ -168,11 +168,11 @@ class Creep(Sprite):
         elif self.state == Creep.DEAD:
             pass
     
-    def mouse_click_event(self, pos):
+    def mouse_click_event(self, pos, is_paused):
         """ The mouse was clicked in pos.
         """
         if self._point_is_inside(vec2d(pos)):
-            self._decrease_health(3)
+            self._decrease_health(3, is_paused)
                 
     #------------------ PRIVATE PARTS ------------------#
     
@@ -210,13 +210,14 @@ class Creep(Sprite):
         except IndexError:
             return False
     
-    def _decrease_health(self, n):
+    def _decrease_health(self, n, is_paused):
         """ Decrease my health by n (or to 0, if it's currently
             less than n)
         """
-        self.health = max(0, self.health - n)
-        if self.health == 0:
-            self._explode()
+        if(not is_paused):
+			self.health = max(0, self.health - n)
+			if self.health == 0:
+				self._explode()
 
     def _explode(self):
         """ Starts the explosion animation that ends the Creep's
@@ -336,12 +337,13 @@ def run_game():
             elif (  event.type == pygame.MOUSEBUTTONDOWN and
                     pygame.mouse.get_pressed()[0]):
                 for creep in creeps:
-                    creep.mouse_click_event(pygame.mouse.get_pos())
+                    creep.mouse_click_event(pygame.mouse.get_pos(), paused)
         
         if not paused:
             # Redraw the background
             draw_background(screen, bg_tile_img, FIELD_RECT)
             
+            msg1 = 'Creeps: %d' % len(creeps)
             msg1 = 'Creeps: %d' % len(creeps)
             msg2 = 'You won!' if len(creeps) == 0 else ''
             draw_messageboard(screen, MESSAGE_RECT, msg1, msg2)
