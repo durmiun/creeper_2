@@ -231,15 +231,17 @@ class Creep(Sprite):
             100, 300)
 
 
-def draw_messageboard(screen, rect, message1, message2):
-    draw_rimmed_box(screen, rect, (50, 20, 0), 4, Color('black'))
-    
-    my_font = pygame.font.SysFont('arial', 20)
-    message1_sf = my_font.render(message1, True, Color('white'))
-    message2_sf = my_font.render(message2, True, Color('white'))
-    
-    screen.blit(message1_sf, rect)
-    screen.blit(message2_sf, rect.move(0, message1_sf.get_height()))
+def draw_messageboard(screen, rect, message1, message2,time):
+	draw_rimmed_box(screen, rect, (50, 20, 0), 4, Color('black'))
+	
+	my_font = pygame.font.SysFont('arial', 20)
+	message1_sf = my_font.render(message1, True, Color('white'))
+	message2_sf = my_font.render(message2, True, Color('white'))
+	time_sf = my_font.render(time, True, Color('white'))
+	
+	screen.blit(message1_sf, rect)
+	screen.blit(message2_sf, rect.move(0, (message1_sf.get_height() * 2)))
+	screen.blit(time_sf, rect.move(0, message1_sf.get_height()))
 
 
 def draw_rimmed_box(screen, box_rect, box_color, 
@@ -275,85 +277,91 @@ def draw_background(screen, tile_img, field_rect):
 
 
 def run_game():
-    # Game parameters
-    SCREEN_WIDTH, SCREEN_HEIGHT = 500, 400
-    FIELD_RECT = Rect(50, 50, 300, 300)
-    MESSAGE_RECT = Rect(360, 50, 130, 50)
-    BG_TILE_IMG = 'images/brick_tile.png'
-    
-    CREEP_FILENAMES = [
-        'images/bluecreep.png', 
-        'images/pinkcreep.png', 
-        'images/graycreep.png']
-    N_CREEPS = 3
+	# Game parameters
+	SCREEN_WIDTH, SCREEN_HEIGHT = 500, 400
+	FIELD_RECT = Rect(50, 50, 300, 300)
+	MESSAGE_RECT = Rect(360, 50, 160, 75)
+	BG_TILE_IMG = 'images/brick_tile.png'
+	
+	CREEP_FILENAMES = [
+		'images/bluecreep.png', 
+		'images/pinkcreep.png', 
+		'images/graycreep.png']
+	N_CREEPS = 3
+	
+	cumulative_time = 0
+	
+	pygame.init()
+	screen = pygame.display.set_mode(
+				(SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
+	clock = pygame.time.Clock()
+	paused = False
 
-    pygame.init()
-    screen = pygame.display.set_mode(
-                (SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
-    clock = pygame.time.Clock()
-    paused = False
+	creep_images = [
+		pygame.image.load(filename).convert_alpha() 
+			for filename in CREEP_FILENAMES]
 
-    creep_images = [
-        pygame.image.load(filename).convert_alpha() 
-            for filename in CREEP_FILENAMES]
+	explosion_img = pygame.image.load('images/explosion1.png').convert_alpha()
+	explosion_images = [
+		explosion_img, pygame.transform.rotate(explosion_img, 90)]
 
-    explosion_img = pygame.image.load('images/explosion1.png').convert_alpha()
-    explosion_images = [
-        explosion_img, pygame.transform.rotate(explosion_img, 90)]
+	bg_tile_img = pygame.image.load(BG_TILE_IMG).convert_alpha()
 
-    bg_tile_img = pygame.image.load(BG_TILE_IMG).convert_alpha()
+	# Create N_CREEPS random creeps.
+	creeps = pygame.sprite.Group()
+	for i in range(N_CREEPS):
+		creeps.add(
+			Creep(  screen=screen,
+					creep_image=choice(creep_images), 
+					explosion_images=explosion_images,
+					field=FIELD_RECT,
+					init_position=( randint(FIELD_RECT.left, 
+											FIELD_RECT.right), 
+									randint(FIELD_RECT.top, 
+											FIELD_RECT.bottom)), 
+					init_direction=(choice([-1, 1]), 
+									choice([-1, 1])),
+					speed=0.05))
 
-    # Create N_CREEPS random creeps.
-    creeps = pygame.sprite.Group()
-    for i in range(N_CREEPS):
-        creeps.add(
-            Creep(  screen=screen,
-                    creep_image=choice(creep_images), 
-                    explosion_images=explosion_images,
-                    field=FIELD_RECT,
-                    init_position=( randint(FIELD_RECT.left, 
-                                            FIELD_RECT.right), 
-                                    randint(FIELD_RECT.top, 
-                                            FIELD_RECT.bottom)), 
-                    init_direction=(choice([-1, 1]), 
-                                    choice([-1, 1])),
-                    speed=0.05))
+	# The main game loop
+	#
+	while True:
+		# Limit frame speed to 50 FPS
+		#
+		time_passed = clock.tick(50)
+		cumulative_time += time_passed
+		if (len(creeps) != 0):
+			last_time = ((cumulative_time - (cumulative_time % 1000)) / 1000)
+		#~ time_passed = clock.tick()
+		#~ print time_passed
+		
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				exit_game()
+			elif event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_SPACE:
+					paused = not paused
+			elif (  event.type == pygame.MOUSEBUTTONDOWN and
+					pygame.mouse.get_pressed()[0]):
+				for creep in creeps:
+					creep.mouse_click_event(pygame.mouse.get_pos(), paused)
+		
+		if not paused:
+			# Redraw the background
+			draw_background(screen, bg_tile_img, FIELD_RECT)
+			
+			msg1 = 'Creeps: %d' % len(creeps)
+			msg1 = 'Creeps: %d' % len(creeps)
+			msg2 = 'You won!' if len(creeps) == 0 else ''
+			time_msg = 'Time: %d' % last_time
+			draw_messageboard(screen, MESSAGE_RECT, msg1, msg2, time_msg)
+			
+			# Update and redraw all creeps
+			for creep in creeps:
+				creep.update(time_passed)
+				creep.draw()
 
-    # The main game loop
-    #
-    while True:
-        # Limit frame speed to 50 FPS
-        #
-        time_passed = clock.tick(50)
-        #~ time_passed = clock.tick()
-        #~ print time_passed
-        
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                exit_game()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    paused = not paused
-            elif (  event.type == pygame.MOUSEBUTTONDOWN and
-                    pygame.mouse.get_pressed()[0]):
-                for creep in creeps:
-                    creep.mouse_click_event(pygame.mouse.get_pos(), paused)
-        
-        if not paused:
-            # Redraw the background
-            draw_background(screen, bg_tile_img, FIELD_RECT)
-            
-            msg1 = 'Creeps: %d' % len(creeps)
-            msg1 = 'Creeps: %d' % len(creeps)
-            msg2 = 'You won!' if len(creeps) == 0 else ''
-            draw_messageboard(screen, MESSAGE_RECT, msg1, msg2)
-            
-            # Update and redraw all creeps
-            for creep in creeps:
-                creep.update(time_passed)
-                creep.draw()
-
-        pygame.display.flip()
+		pygame.display.flip()
 
 
 def exit_game():
